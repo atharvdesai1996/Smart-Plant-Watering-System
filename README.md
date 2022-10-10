@@ -2,10 +2,10 @@
 
 ## Overview
 
-# Hardware Platform
+## Hardware Platform
 
-# Software Details
+## Software Details
 
-# Open Source Projects Used
+## Open Source Projects Used
 
-# Source Code Organization
+## Source Code Organization
