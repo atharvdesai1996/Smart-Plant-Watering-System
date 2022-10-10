@@ -1,6 +1,6 @@
 # Smart-Plant-Watering-System
 
-# Overview
+## Overview
 
 # Hardware Platform
 
