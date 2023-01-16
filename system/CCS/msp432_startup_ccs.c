@@ -37,11 +37,16 @@
 #include <stdint.h>
 #include <driverlib.h>
 
+
 /* Forward declaration of the default fault handlers. */
 static void resetISR(void);
 static void nmiISR(void);
 static void faultISR(void);
 static void defaultISR(void);
+
+static void ADC14_IRQHandler(void);
+void EUSCIA0_IRQHandler(void);
+void EusciA0_ISR(void);
 
 
 /* External declaration for the reset handler that is to be called when the */
@@ -106,7 +111,10 @@ void (* const interruptVectors[])(void) =
     defaultISR,                             /* TA2_N ISR                 */
     defaultISR,                             /* TA3_0 ISR                 */
     defaultISR,                             /* TA3_N ISR                 */
-	vUART_Handler,                        /* EUSCIA0 ISR               */
+    //EusciA0_ISR,
+	//vUART_Handler,                        /* EUSCIA0 ISR               */
+    //EUSCIA0_IRQHandler,                     /* EUSCIA0 ISR               */
+    defaultISR,                             /* EUSCIA1 ISR               */
     defaultISR,                             /* EUSCIA1 ISR               */
     defaultISR,                             /* EUSCIA2 ISR               */
     defaultISR,                             /* EUSCIA3 ISR               */
@@ -114,7 +122,7 @@ void (* const interruptVectors[])(void) =
     defaultISR,                             /* EUSCIB1 ISR               */
     defaultISR,                             /* EUSCIB2 ISR               */
     defaultISR,                             /* EUSCIB3 ISR               */
-    defaultISR,                             /* ADC14 ISR                 */
+    ADC14_IRQHandler,                             /* ADC14 ISR                 */
 	vT32_0_Handler,                         /* T32_INT1 ISR              */
 	vT32_1_Handler,                         /* T32_INT2 ISR              */
     defaultISR,                             /* T32_INTC ISR              */
@@ -209,6 +217,58 @@ static void faultISR(void)
 
     #pragma diag_pop
 }
+
+/////////////////////////////////////////////
+extern volatile uint16_t curADCResult;
+static volatile uint16_t normalizedADCRes;
+static void ADC14_IRQHandler(void)
+{
+    uint64_t status;
+    status = MAP_ADC14_getEnabledInterruptStatus();
+    MAP_ADC14_clearInterruptFlag(status);
+
+
+    curADCResult = MAP_ADC14_getResult(ADC_MEM0);
+    normalizedADCRes = (curADCResult * 3.3) / 16384;
+   // printf("Sensor value = %d", curADCResult);
+    // User UART COM port with 9600 baud
+    printff(EUSCI_A0_BASE, "val = %u\r\n", normalizedADCRes);
+    const char rec = 's';
+  //  UART_transmitData(EUSCI_A0_BASE, rec);
+    MAP_ADC14_toggleConversionTrigger();
+}
+
+/* EUSCI A0 UART ISR - Echoes data back to PC host */
+void EUSCIA0_IRQHandler(void)
+{
+    uint32_t status = MAP_UART_getEnabledInterruptStatus(EUSCI_A0_BASE);
+
+    MAP_UART_clearInterruptFlag(EUSCI_A0_BASE, status);
+
+    if(status & EUSCI_A_UART_RECEIVE_INTERRUPT)
+    {
+        MAP_UART_transmitData(EUSCI_A0_BASE, MAP_UART_receiveData(EUSCI_A0_BASE));
+    }
+
+}
+
+
+/*
+ * USCIA0 interrupt handler.
+ */
+void EusciA0_ISR(void)
+{
+    int receiveByte = UCA0RXBUF;
+
+    GPIO_setOutputHighOnPin(GPIO_PORT_P1, GPIO_PIN0);
+
+    /* Echo back. */
+    EUSCI_A_UART_transmitData(EUSCI_A0_BASE, receiveByte);
+
+    GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
+}
+
+///////////////////////////////////////////
 
 
 /* This is the code that gets called when the processor receives an unexpected  */
