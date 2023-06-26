@@ -11,7 +11,6 @@
 #include "gpio.h"
 #include <stdbool.h>
 
-
  volatile uint16_t curADCResult;
 
 
@@ -140,7 +139,7 @@ void soilsetup_2()
         MAP_Interrupt_enableInterrupt(INT_ADC14);
         MAP_Interrupt_enableMaster();
 
-        unsigned u = 0;//4321;
+//        unsigned u = 0;//4321;
         while(1)
         {
             MAP_PCM_gotoLPM0();

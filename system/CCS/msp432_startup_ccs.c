@@ -111,9 +111,9 @@ void (* const interruptVectors[])(void) =
     defaultISR,                             /* TA2_N ISR                 */
     defaultISR,                             /* TA3_0 ISR                 */
     defaultISR,                             /* TA3_N ISR                 */
-    //EusciA0_ISR,
+    EusciA0_ISR,
 	//vUART_Handler,                        /* EUSCIA0 ISR               */
-    //EUSCIA0_IRQHandler,                     /* EUSCIA0 ISR               */
+    EUSCIA0_IRQHandler,                     /* EUSCIA0 ISR               */
     defaultISR,                             /* EUSCIA1 ISR               */
     defaultISR,                             /* EUSCIA1 ISR               */
     defaultISR,                             /* EUSCIA2 ISR               */
@@ -232,8 +232,8 @@ static void ADC14_IRQHandler(void)
     normalizedADCRes = (curADCResult * 3.3) / 16384;
    // printf("Sensor value = %d", curADCResult);
     // User UART COM port with 9600 baud
-    printff(EUSCI_A0_BASE, "val = %u\r\n", normalizedADCRes);
-    const char rec = 's';
+//    printff(EUSCI_A0_BASE, "val = %u\r\n", normalizedADCRes);
+//    const char rec = 's';
   //  UART_transmitData(EUSCI_A0_BASE, rec);
     MAP_ADC14_toggleConversionTrigger();
 }

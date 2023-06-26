@@ -85,6 +85,8 @@
 /* TI includes. */
 #include "gpio.h"
 #include "msp432p401r.h"
+#include "lux_sensor.h"
+#include <printf.h>
 
 /* Priorities at which the tasks are created. */
 #define mainQUEUE_RECEIVE_TASK_PRIORITY     ( tskIDLE_PRIORITY + 2 )
@@ -109,8 +111,8 @@ functionality. */
 /*
  * The tasks as described in the comments at the top of this file.
  */
-static void prvQueueReceiveTask( void *pvParameters );
-static void prvQueueSendTask( void *pvParameters );
+//static void prvQueueReceiveTask( void *pvParameters );
+//static void prvQueueSendTask( void *pvParameters );
 
 /*
  * Called by main() to create the simply blinky style application if
@@ -122,19 +124,19 @@ void main_blinky( void );
  * The full demo configures the clocks for maximum frequency, whereas this blinky
  * demo uses a slower clock as it also uses low power features.
  */
-static void prvConfigureClocks( void );
+//static void prvConfigureClocks( void );
 
 /* 
  * Configure a button to generate interrupts (for test purposes).  This is done
  * to test waking on an interrupt other than the systick interrupt in tickless
  * idle mode.
  */
-static void prvConfigureButton( void );
+//static void prvConfigureButton( void );
 
 /*-----------------------------------------------------------*/
 
 /* The queue used by both tasks. */
-static QueueHandle_t xQueue = NULL;
+//static QueueHandle_t xQueue = NULL;
 
 /*-----------------------------------------------------------*/
 extern void Soil_SetupADC();
@@ -182,103 +184,156 @@ void main_blinky( void )
     for( ;; ); */
     //printf("hello");
     //Soil_SetupADC();
-    soilsetup_2();
-
-}
-/*-----------------------------------------------------------*/
-
-static void prvQueueSendTask( void *pvParameters )
-{
-TickType_t xNextWakeTime;
-const unsigned long ulValueToSend = 100UL;
-
-    /* Check the task parameter is as expected. */
-    configASSERT( ( ( unsigned long ) pvParameters ) == mainQUEUE_SEND_PARAMETER );
-
-    /* Initialise xNextWakeTime - this only needs to be done once. */
-    xNextWakeTime = xTaskGetTickCount();
-
-    for( ;; )
+//    soilsetup_2();
+    /* Configuring UART Module */
+    const eUSCI_UART_Config uartConfig =
     {
-        /* Place this task in the blocked state until it is time to run again.
-        The block time is specified in ticks, the constant used converts ticks
-        to ms.  While in the Blocked state this task will not consume any CPU
-        time. */
-        vTaskDelayUntil( &xNextWakeTime, mainQUEUE_SEND_FREQUENCY_MS );
+            EUSCI_A_UART_CLOCKSOURCE_SMCLK,          // SMCLK Clock Source
+            78,                                     // BRDIV = 78
+            2,                                       // UCxBRF = 2
+            0,                                       // UCxBRS = 0
+            EUSCI_A_UART_NO_PARITY,                  // No Parity
+            EUSCI_A_UART_LSB_FIRST,                  // LSB First
+            EUSCI_A_UART_ONE_STOP_BIT,               // One stop bit
+            EUSCI_A_UART_MODE,                       // UART mode
+            EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION,  // Oversampling
+    };
 
-        /* Send to the queue - causing the queue receive task to unblock and
-        toggle the LED.  0 is used as the block time so the sending operation
-        will not block - it shouldn't need to block as the queue should always
-        be empty at this point in the code. */
-        xQueueSend( xQueue, &ulValueToSend, 0U );
-    }
-}
-/*-----------------------------------------------------------*/
+    /* Selecting P1.2 and P1.3 in UART mode */
+    MAP_GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P1,
+            GPIO_PIN1 | GPIO_PIN2 | GPIO_PIN3, GPIO_PRIMARY_MODULE_FUNCTION);
 
-static void prvQueueReceiveTask( void *pvParameters )
-{
-unsigned long ulReceivedValue;
-static const TickType_t xShortBlock = pdMS_TO_TICKS( 50 );
+/*    MAP_UART_initModule(EUSCI_A0_BASE, &uartConfig);                              */
 
-    /* Check the task parameter is as expected. */
-    configASSERT( ( ( unsigned long ) pvParameters ) == mainQUEUE_RECEIVE_PARAMETER );
+    /* Enable UART module
+    MAP_UART_enableModule(EUSCI_A0_BASE);
 
-    for( ;; )
-    {
-        /* Wait until something arrives in the queue - this task will block
-        indefinitely provided INCLUDE_vTaskSuspend is set to 1 in
-        FreeRTOSConfig.h. */
-        xQueueReceive( xQueue, &ulReceivedValue, portMAX_DELAY );
+    UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
+    Interrupt_enableInterrupt(INT_EUSCIA0);
+    Interrupt_enableMaster();   */
 
-        /*  To get here something must have been received from the queue, but
-        is it the expected value?  If it is, toggle the LED. */
-        if( ulReceivedValue == 100UL )
-        {
-            /* Blip the LED for a short while so as not to use too much
-            power. */
-            configTOGGLE_LED();
-            vTaskDelay( xShortBlock );
-            configTOGGLE_LED();
-            ulReceivedValue = 0U;
-        }
-    }
-}
-/*-----------------------------------------------------------*/
+    ///////////////////////////////////////////////////////////////////////
+    /* Atharv try  Configuring UART Module */
+    MAP_WDT_A_holdTimer();
 
-static void prvConfigureClocks( void )
-{
-    /* The full demo configures the clocks for maximum frequency, whereas this
-    blinky demo uses a slower clock as it also uses low power features.
+    /* Setting DCO to 12MHz */
+    CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_12);
 
-    From the datasheet:  For AM_LDO_VCORE0 and AM_DCDC_VCORE0 modes, the maximum
-    CPU operating frequency is 24 MHz and maximum input clock frequency for
-    peripherals is 12 MHz. */
-    FlashCtl_setWaitState( FLASH_BANK0, 2 );
-    FlashCtl_setWaitState( FLASH_BANK1, 2 );
-    CS_setDCOCenteredFrequency( CS_DCO_FREQUENCY_3 );
-    CS_initClockSignal( CS_HSMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
-    CS_initClockSignal( CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
-    CS_initClockSignal( CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
-    CS_initClockSignal( CS_ACLK, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
+           MAP_UART_initModule(EUSCI_A0_BASE, &uartConfig);
 
-    /* The lower frequency allows the use of CVORE level 0. */
-   // PCM_setCoreVoltageLevel( PCM_VCORE0 );
+           /* Enable UART module */
+           MAP_UART_enableModule(EUSCI_A0_BASE);
+
+           /* Enabling interrupts */
+           MAP_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
+           MAP_Interrupt_enableInterrupt(INT_EUSCIA0);
+           MAP_Interrupt_enableSleepOnIsrExit();
+           MAP_Interrupt_enableMaster();
+//////////////////////////////////////////////////////////////
+//    while(1){
+//        printff(EUSCI_A0_BASE, "\nI2c Init\r\n");
+//         //   const char rec = 's';
+//         //   UART_transmitData(EUSCI_A0_BASE, rec);
+//    };
+
+     get_veml700_value();
 
 
 }
 /*-----------------------------------------------------------*/
 
-static void prvConfigureButton( void )
-{
-volatile uint8_t ucPin;
+//static void prvQueueSendTask( void *pvParameters )
+//{
+//TickType_t xNextWakeTime;
+//const unsigned long ulValueToSend = 100UL;
+//
+//    /* Check the task parameter is as expected. */
+//    configASSERT( ( ( unsigned long ) pvParameters ) == mainQUEUE_SEND_PARAMETER );
+//
+//    /* Initialise xNextWakeTime - this only needs to be done once. */
+//    xNextWakeTime = xTaskGetTickCount();
+//
+//    for( ;; )
+//    {
+//        /* Place this task in the blocked state until it is time to run again.
+//        The block time is specified in ticks, the constant used converts ticks
+//        to ms.  While in the Blocked state this task will not consume any CPU
+//        time. */
+//        vTaskDelayUntil( &xNextWakeTime, mainQUEUE_SEND_FREQUENCY_MS );
+//
+//        /* Send to the queue - causing the queue receive task to unblock and
+//        toggle the LED.  0 is used as the block time so the sending operation
+//        will not block - it shouldn't need to block as the queue should always
+//        be empty at this point in the code. */
+//        xQueueSend( xQueue, &ulValueToSend, 0U );
+//    }
+//}
+/*-----------------------------------------------------------*/
 
-    /* Configure button S1 to generate interrupts.  This is done to test the
-    code path were low power mode is exited for a reason other than a tick
-    interrupt. */
-    GPIO_setAsInputPinWithPullUpResistor( GPIO_PORT_P1, GPIO_PIN1 );
-    GPIO_enableInterrupt( GPIO_PORT_P1, GPIO_PIN1 );
-    Interrupt_enableInterrupt( INT_PORT1 );
-}
+//static void prvQueueReceiveTask( void *pvParameters )
+//{
+//unsigned long ulReceivedValue;
+//static const TickType_t xShortBlock = pdMS_TO_TICKS( 50 );
+//
+//    /* Check the task parameter is as expected. */
+//    configASSERT( ( ( unsigned long ) pvParameters ) == mainQUEUE_RECEIVE_PARAMETER );
+//
+//    for( ;; )
+//    {
+//        /* Wait until something arrives in the queue - this task will block
+//        indefinitely provided INCLUDE_vTaskSuspend is set to 1 in
+//        FreeRTOSConfig.h. */
+//        xQueueReceive( xQueue, &ulReceivedValue, portMAX_DELAY );
+//
+//        /*  To get here something must have been received from the queue, but
+//        is it the expected value?  If it is, toggle the LED. */
+//        if( ulReceivedValue == 100UL )
+//        {
+//            /* Blip the LED for a short while so as not to use too much
+//            power. */
+//            configTOGGLE_LED();
+//            vTaskDelay( xShortBlock );
+//            configTOGGLE_LED();
+//            ulReceivedValue = 0U;
+//        }
+//    }
+//}
+/*-----------------------------------------------------------*/
+
+//static void prvConfigureClocks( void )
+//{
+//    /* The full demo configures the clocks for maximum frequency, whereas this
+//    blinky demo uses a slower clock as it also uses low power features.
+//
+//    From the datasheet:  For AM_LDO_VCORE0 and AM_DCDC_VCORE0 modes, the maximum
+//    CPU operating frequency is 24 MHz and maximum input clock frequency for
+//    peripherals is 12 MHz. */
+//    FlashCtl_setWaitState( FLASH_BANK0, 2 );
+//    FlashCtl_setWaitState( FLASH_BANK1, 2 );
+//    CS_setDCOCenteredFrequency( CS_DCO_FREQUENCY_3 );
+//    CS_initClockSignal( CS_HSMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
+//    CS_initClockSignal( CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
+//    CS_initClockSignal( CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
+//    CS_initClockSignal( CS_ACLK, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1 );
+//
+//    /* The lower frequency allows the use of CVORE level 0. */
+//   // PCM_setCoreVoltageLevel( PCM_VCORE0 );
+//
+//
+//}
+/*-----------------------------------------------------------*/
+
+//static void prvConfigureButton( void )
+//{
+//volatile uint8_t ucPin;
+//
+//    /* Configure button S1 to generate interrupts.  This is done to test the
+//    code path were low power mode is exited for a reason other than a tick
+//    interrupt. */
+//    GPIO_setAsInputPinWithPullUpResistor( GPIO_PORT_P1, GPIO_PIN1 );
+//    GPIO_enableInterrupt( GPIO_PORT_P1, GPIO_PIN1 );
+//    Interrupt_enableInterrupt( INT_PORT1 );
+//}
 /*-----------------------------------------------------------*/
 
 void PORT1_IRQHandler( void )
