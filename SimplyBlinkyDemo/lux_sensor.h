@@ -23,12 +23,15 @@ float lux;
 // 7 bit slave address = 0x10
 #define VEML7700_ADDR 0x10
 // According 8 bit the bus address is then 0010 0000 = 20h for write and 0010 0001 = 21h for read
+#define I2C_MASTER_WRITE 0
+#define I2C_MASTER_READ 1
 
 void I2C_init(void);
 void configure_sensor(void);
 void I2C_write(uint8_t slaveAddress, uint8_t *data, uint8_t length);
 void read_light_level(void);
 void get_veml700_value(void);
+//void EUSCIB0_IRQHandler(void);
 
 
 #endif

@@ -15,6 +15,7 @@ volatile uint8_t rxIndex = 0;
 
 // Global variable to store the received light level
 volatile uint16_t lightLevel = 0;
+volatile uint16_t temp = 0;
 
 void I2C_init(void)
 {
@@ -43,8 +44,8 @@ void I2C_init(void)
 //    I2C_enableInterrupt(EUSCI_B0_BASE, EUSCIB0_IRQn);
 
     I2C_enableModule(EUSCI_B0_BASE);
-    I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0 + EUSCI_B_I2C_RECEIVE_INTERRUPT0);
-    I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0 | EUSCI_B_I2C_RECEIVE_INTERRUPT0);
+    I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0 | EUSCI_B_I2C_RECEIVE_INTERRUPT0);
+    I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0);
     Interrupt_enableInterrupt(INT_EUSCIB0);
     // Enable and clear the interrupt flag
     Interrupt_enableMaster();
@@ -88,52 +89,61 @@ void configure_sensor(void) {
   // Refer to the VEML7700 datasheet for the configuration options
 
   // Set the integration time to 800ms (default)
-  uint8_t configData[3] = {CONFIG_REG, 0x00, 0xCO};
+  uint8_t configData[3] = {COMMAND_REG, 0x00, 0xC0};
   I2C_write(VEML7700_ADDR, configData, 2);
 }
 
 // Function to write data to the VEML7700 sensor
-void I2C_write(uint8_t slaveAddress, uint8_t *data, uint8_t length) {
-  // Set the slave address and the mode to transmit
-  I2C_setSlaveAddress(EUSCI_B0_BASE, slaveAddress);
-  I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
+void I2C_write(uint8_t slaveAddress, uint8_t *data, uint8_t length)
+{
 
-  // Start the transmission
-  I2C_masterSendMultiByteStart(EUSCI_B0_BASE, *data++);
+//    I2C_masterSendStart(EUSCI_B0_BASE);
+    // The mode to transmit
+    I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
 
-  // Transmit the data bytes
-  while (length-- > 1) {
-    I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *data++);
-  }
+    I2C_masterSendMultiByteStart(EUSCI_B0_BASE, slaveAddress);
+    // Start the transmission
+    I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
 
-  // Send the stop condition
-  I2C_masterSendMultiByteFinish(EUSCI_B0_BASE, *data);
+    // Transmit the data bytes
+    while (length-- > 1)
+    {
+      I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
+    }
+
+    // Send the stop condition
+    I2C_masterSendMultiByteFinish(EUSCI_B0_BASE, *data);
 }
 
-// I2C receive interrupt handler
-void EUSCIB0_IRQHandler(void) {
+void I2C_read(uint8_t slaveAddress, uint8_t *data, uint8_t length){
+    //    I2C_masterSendStart(EUSCI_B0_BASE);
+        // The mode to transmit
+//        I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
 
-    if(I2C_getInterruptStatus(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0))
-    {
+        I2C_masterSendMultiByteStart(EUSCI_B0_BASE, slaveAddress | I2C_MASTER_WRITE);
+        // Start the transmission
+        I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
 
-    }
-    else if(I2C_getInterruptStatus(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0))
-    {
-        // Read the received data
-        lightLevel = I2C_slaveGetData(EUSCI_B0_BASE);
+        I2C_masterSendMultiByteStart(EUSCI_B0_BASE, slaveAddress | I2C_MASTER_READ);
 
-        // Clear the receive interrupt flag
-        I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
-    }
-    I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0 | EUSCI_B_I2C_RECEIVE_INTERRUPT0)
-        // Check if the receive interrupt flag is set
+        // Transmit the data bytes
+        while (length-- > 1)
+        {
+            I2C_masterReceiveMultiByteNext(EUSCI_B0_BASE);
+            temp = lightLevel;
+        }
+
+        // Send the stop condition
+        I2C_masterReceiveMultiByteFinish(EUSCI_B0_BASE);
+        temp |= lightLevel << 8;
 }
+
 
 // Function to read the ambient light level in lux from the VEML7700 sensor
 void read_light_level(void) {
   // Trigger a single measurement by writing to the command register
-  uint8_t commandData[2] = {COMMAND_REG, 0x01};
-  I2C_write(VEML7700_ADDR, commandData, 2);
+  uint8_t commandData[2] = {DATA_REG};
+  I2C_read(VEML7700_ADDR, commandData, 2);
 }
 
 // Main program
@@ -154,16 +164,17 @@ void get_veml700_value(void){
         read_light_level();
 
         // Wait for the receive interrupt to occur
-        while (lightLevel == 0);
+        while (temp == 0);
 
         // Convert the raw light level to lux (adjust the calculation if necessary)
-        float lux = lightLevel * 0.0576;
+        float lux = temp * 0.0576;
 
         // Print the ambient light level (or use it as per your requirement)
         printff(EUSCI_A0_BASE, "Ambient Light Level: %.2f lux\r\n", lux);
 
         // Reset the lightLevel variable for the next measurement
         lightLevel = 0;
+        temp = 0;
 
         // Delay for some time before taking the next reading
         // Adjust this delay as per your requirement
@@ -173,7 +184,32 @@ void get_veml700_value(void){
 }
 
 
+// I2C receive interrupt handler
+void EUSCIB0_IRQHandler(void)
+{
 
+    Interrupt_disableInterrupt(INT_EUSCIB0);
+//    if(I2C_getInterruptStatus(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0))
+//    {
+//
+//    }
+//    else if(I2C_getInterruptStatus(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0))
+//    {
+//        // Read the received data
+//        lightLevel = I2C_slaveGetData(EUSCI_B0_BASE);
+//
+//    }
+
+        if(I2C_getInterruptStatus(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0))
+        {
+            // Read the received data
+            lightLevel = I2C_slaveGetData(EUSCI_B0_BASE);
+
+        }
+    I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0 | EUSCI_B_I2C_RECEIVE_INTERRUPT0);
+        // Check if the receive interrupt flag is set
+    Interrupt_enableInterrupt(INT_EUSCIB0);
+}
 
 //void sendI2CData()
 //{

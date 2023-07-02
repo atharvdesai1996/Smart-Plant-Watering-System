@@ -36,6 +36,7 @@
 
 #include <stdint.h>
 #include <driverlib.h>
+#include "SimplyBlinkyDemo/lux_sensor.h"
 
 
 /* Forward declaration of the default fault handlers. */
@@ -70,6 +71,7 @@ demo application. */
 extern void vUART_Handler( void );
 extern void vT32_0_Handler( void );
 extern void vT32_1_Handler( void );
+extern void EUSCIB0_IRQHandler(void);
 
 /* Intrrupt vector table.  Note that the proper constructs must be placed on this to  */
 /* ensure that it ends up at physical address 0x0000.0000 or at the start of          */
@@ -118,11 +120,11 @@ void (* const interruptVectors[])(void) =
     defaultISR,                             /* EUSCIA1 ISR               */
     defaultISR,                             /* EUSCIA2 ISR               */
     defaultISR,                             /* EUSCIA3 ISR               */
-    defaultISR,                             /* EUSCIB0 ISR               */
+    EUSCIB0_IRQHandler,                     /* EUSCIB0 ISR               */
     defaultISR,                             /* EUSCIB1 ISR               */
     defaultISR,                             /* EUSCIB2 ISR               */
     defaultISR,                             /* EUSCIB3 ISR               */
-    ADC14_IRQHandler,                             /* ADC14 ISR                 */
+    ADC14_IRQHandler,                       /* ADC14 ISR                 */
 	vT32_0_Handler,                         /* T32_INT1 ISR              */
 	vT32_1_Handler,                         /* T32_INT2 ISR              */
     defaultISR,                             /* T32_INTC ISR              */
@@ -134,7 +136,7 @@ void (* const interruptVectors[])(void) =
     defaultISR,                             /* DMA_INT1 ISR              */
     defaultISR,                             /* DMA_INT0 ISR              */
 	defaultISR,                             /* PORT1 ISR                 */
-    defaultISR,                             /* PORT2 ISR                 */
+	defaultISR,                             /* PORT2 ISR                 */
     defaultISR,                             /* PORT3 ISR                 */
     defaultISR,                             /* PORT4 ISR                 */
     defaultISR,                             /* PORT5 ISR                 */
@@ -287,3 +289,6 @@ static void defaultISR(void)
 
     #pragma diag_pop
 }
+
+
+

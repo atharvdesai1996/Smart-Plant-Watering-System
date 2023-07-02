@@ -273,7 +273,7 @@ void I2C_masterSendMultiByteStart(uint32_t moduleInstance, uint8_t txData)
     uint16_t txieStatus = EUSCI_B_CMSIS(moduleInstance)->IE & EUSCI_B_IE_TXIE0;
 
     //Disable transmit interrupt enable
-    BITBAND_PERI(EUSCI_B_CMSIS(moduleInstance)->IE, EUSCI_B_IE_TXIE0_OFS) = 0;
+//    BITBAND_PERI(EUSCI_B_CMSIS(moduleInstance)->IE, EUSCI_B_IE_TXIE0_OFS) = 0;
 
     //Send start condition.
     EUSCI_B_CMSIS(moduleInstance)->CTLW0 |= EUSCI_B_CTLW0_TR + EUSCI_B_CTLW0_TXSTT;
@@ -282,7 +282,7 @@ void I2C_masterSendMultiByteStart(uint32_t moduleInstance, uint8_t txData)
     while (!BITBAND_PERI(EUSCI_B_CMSIS(moduleInstance)->IFG, EUSCI_B_IFG_TXIFG0_OFS))
         ;
 
-    //Send single byte data.
+    //Send single byte data.7
     EUSCI_B_CMSIS(moduleInstance)->TXBUF = txData;
 
     //Reinstate transmit interrupt enable
