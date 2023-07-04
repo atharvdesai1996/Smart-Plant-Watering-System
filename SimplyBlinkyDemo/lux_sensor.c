@@ -49,6 +49,9 @@ void I2C_init(void)
     Interrupt_enableInterrupt(INT_EUSCIB0);
     // Enable and clear the interrupt flag
     Interrupt_enableMaster();
+    // Enable I2C interrupts in NVIC
+    NVIC_EnableIRQ(EUSCIB0_IRQn);
+
 }
 
 void I2C_init_poll(void)
@@ -156,6 +159,10 @@ void get_veml700_value(void){
 
      // Enable the I2C receive interrupt
      I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
+     Interrupt_enableInterrupt(INT_EUSCIB0);z
+     // Enable I2C interrupts in NVIC
+     NVIC_EnableIRQ(EUSCIB0_IRQn);
+
 
      // Enable the global interrupt
      Interrupt_enableInterrupt(INT_EUSCIB0);
