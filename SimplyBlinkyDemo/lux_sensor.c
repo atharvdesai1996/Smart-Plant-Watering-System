@@ -1,4 +1,5 @@
 #include "lux_sensor.h"
+#include "rom_map.h"
 #define DATA_SIZE 16
 
 //volatile uint8_t txData[DATA_SIZE];
@@ -35,7 +36,6 @@ void I2C_init(void)
     };
 
     I2C_disableModule(EUSCI_B0_BASE);
-
     I2C_initMaster(EUSCI_B0_BASE, &i2cConfig);
     I2C_setSlaveAddress(EUSCI_B0_BASE, VEML7700_ADDR);
 //    I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
@@ -89,7 +89,7 @@ void configure_sensor(void) {
   // Refer to the VEML7700 datasheet for the configuration options
 
   // Set the integration time to 800ms (default)
-  uint8_t configData[3] = {COMMAND_REG, 0x00, 0xC0};
+  uint8_t configData[3] = {COMMAND_REG, 0xC0, 0x00};
   I2C_write(VEML7700_ADDR, configData, 2);
 }
 
@@ -149,10 +149,12 @@ void read_light_level(void) {
 // Main program
 void get_veml700_value(void){
     // Initialize the I2C module of VEML7700
-     I2C_init();
+     ////////I2C_init();
+    AD_I2C_init();
 
      // Configure the VEML7700 sensor
-     configure_sensor();
+     //configure_sensor();
+    AD_configure_sensor();
 
      // Enable the I2C receive interrupt
      I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
@@ -185,6 +187,7 @@ void get_veml700_value(void){
 
 
 // I2C receive interrupt handler
+/*
 void EUSCIB0_IRQHandler(void)
 {
 
@@ -209,7 +212,7 @@ void EUSCIB0_IRQHandler(void)
     I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0 | EUSCI_B_I2C_RECEIVE_INTERRUPT0);
         // Check if the receive interrupt flag is set
     Interrupt_enableInterrupt(INT_EUSCIB0);
-}
+} */
 
 //void sendI2CData()
 //{
@@ -319,3 +322,126 @@ void EUSCIB0_IRQHandler(void)
 //
 //
 //
+
+//////////////////////// AD Trials
+#define NUM_OF_REC_BYTES 2
+static uint8_t RXData[NUM_OF_REC_BYTES];
+
+void AD_I2C_init(void)
+{
+    // I2C pins P1.6 SDA, P1.7 SCL UCB0SDA/SCL
+    MAP_GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P1, GPIO_PIN6 + GPIO_PIN7, GPIO_PRIMARY_MODULE_FUNCTION);
+
+    const eUSCI_I2C_MasterConfig i2cConfig =
+    {
+        EUSCI_B_I2C_CLOCKSOURCE_SMCLK,                  // SMCLKs Clock Source
+        3000000,                                       // SMCLK = 3MHz
+        EUSCI_B_I2C_SET_DATA_RATE_100KBPS,              // Data transfer rate 100kBPS
+        0,                                              // sets threshold for auto stop or UCSTPIFG
+        EUSCI_B_I2C_NO_AUTO_STOP                        // sets up the stop condition generation
+    };
+
+   // I2C_disableModule(EUSCI_B0_BASE);
+    memset(RXData, 0x00, NUM_OF_REC_BYTES);
+
+    MAP_I2C_initMaster(EUSCI_B0_BASE, &i2cConfig);
+    MAP_I2C_setSlaveAddress(EUSCI_B0_BASE, VEML7700_ADDR);
+
+    /* Set Master in transmit mode */
+    MAP_I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
+
+    /* Enable I2C Module to start operations */
+    MAP_I2C_enableModule(EUSCI_B0_BASE);
+
+    /* Enable and clear the interrupt flag */
+    MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
+    MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_NAK_INTERRUPT);
+    MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0);
+
+    //Enable master Transmit interrupt
+
+    MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_NAK_INTERRUPT);
+    MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
+    MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0);
+
+    MAP_Interrupt_enableSleepOnIsrExit();
+    MAP_Interrupt_enableInterrupt(INT_EUSCIB0);
+
+
+    // Enable and clear the interrupt flag
+    MAP_Interrupt_enableMaster();
+}
+
+
+// Function to configure the VEML7700 sensor
+void AD_configure_sensor(void) {
+  // Configure the sensor by writing to the configuration register
+  // For example, you can set the integration time, gain, and other parameters here
+  // Refer to the VEML7700 datasheet for the configuration options
+
+  // Set the integration time to 800ms (default)
+  uint8_t configData[3] = {COMMAND_REG, 0xC0, 0x00};
+  AD_I2C_write(VEML7700_ADDR, configData, 2);
+
+}
+
+
+// Function to write data to the VEML7700 sensor
+void AD_I2C_write(uint8_t slaveAddress, uint8_t *data, uint8_t length)
+{
+
+//    I2C_masterSendStart(EUSCI_B0_BASE);
+    // The mode to transmit
+    MAP_I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
+
+    MAP_I2C_masterSendMultiByteStart(EUSCI_B0_BASE, slaveAddress);
+    // Start the transmission
+    I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
+
+    // Transmit the data bytes
+    while (length-- > 1)
+    {
+      I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
+    }
+
+    // Send the stop condition
+    I2C_masterSendMultiByteFinish(EUSCI_B0_BASE, *data);
+}
+
+/*******************************************************************************
+ * eUSCIB0 ISR. The repeated start and transmit/receive operations happen
+ * within this ISR.
+ *******************************************************************************/
+void EUSCIB0_IRQHandler(void)
+{
+
+
+
+    uint_fast16_t status;
+    status = MAP_I2C_getEnabledInterruptStatus(EUSCI_B0_BASE);
+    MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, status);
+
+
+    /* If transmit interrupt 0 received, send another start to initiate receive */
+    if ( status & EUSCI_B_I2C_TRANSMIT_INTERRUPT0 )
+    {
+      MAP_I2C_disableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0);
+      MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
+      MAP_I2C_masterReceiveStart(EUSCI_B0_BASE);
+    }
+
+    /* Receives bytes into the receive buffer. If we have received all bytes,
+     * send a STOP condition */
+    else if ( status & EUSCI_B_I2C_RECEIVE_INTERRUPT0 )
+    {
+        // Read the received data
+        lightLevel = I2C_slaveGetData(EUSCI_B0_BASE);
+
+    }
+    else if ( status & EUSCI_B_I2C_STOP_INTERRUPT )
+    {
+      MAP_I2C_disableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_STOP_INTERRUPT);
+
+    }
+    Interrupt_enableInterrupt(INT_EUSCIB0);
+}
