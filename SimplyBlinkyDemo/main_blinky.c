@@ -219,16 +219,21 @@ void main_blinky( void )
     /* Setting DCO to 12MHz */
     CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_12);
 
+    // Below APIS are needed for UART
+    /*
+    MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_4);   // HSMCLK to 3 MHz
+
            MAP_UART_initModule(EUSCI_A0_BASE, &uartConfig);
 
-           /* Enable UART module */
+           // Enable UART module
            MAP_UART_enableModule(EUSCI_A0_BASE);
 
-           /* Enabling interrupts */
+           // Enabling interrupts
            MAP_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
            MAP_Interrupt_enableInterrupt(INT_EUSCIA0);
+
            MAP_Interrupt_enableSleepOnIsrExit();
-           MAP_Interrupt_enableMaster();
+           MAP_Interrupt_enableMaster();*/
 //////////////////////////////////////////////////////////////
 //    while(1){
 //        printff(EUSCI_A0_BASE, "\nI2c Init\r\n");

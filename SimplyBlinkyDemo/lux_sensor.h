@@ -34,4 +34,8 @@ void get_veml700_value(void);
 //void EUSCIB0_IRQHandler(void);
 
 
+void AD_I2C_init(void);
+void AD_configure_sensor(void);
+void AD_I2C_write(uint8_t slaveAddress, uint8_t *data, uint8_t length);
+
 #endif

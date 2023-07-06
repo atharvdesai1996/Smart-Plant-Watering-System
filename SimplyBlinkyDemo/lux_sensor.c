@@ -1,5 +1,7 @@
 #include "lux_sensor.h"
 #include "rom_map.h"
+#include "string.h"
+#include "driverlib.h"
 #define DATA_SIZE 16
 
 //volatile uint8_t txData[DATA_SIZE];
@@ -161,7 +163,7 @@ void get_veml700_value(void){
 
      // Enable the I2C receive interrupt
      I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
-     Interrupt_enableInterrupt(INT_EUSCIB0);z
+     Interrupt_enableInterrupt(INT_EUSCIB0);
      // Enable I2C interrupts in NVIC
      NVIC_EnableIRQ(EUSCIB0_IRQn);
 
@@ -358,25 +360,29 @@ void AD_I2C_init(void)
     MAP_I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
 
     /* Enable I2C Module to start operations */
+    MAP_I2C_disableModule(EUSCI_B0_BASE);
     MAP_I2C_enableModule(EUSCI_B0_BASE);
+
+
+
 
     /* Enable and clear the interrupt flag */
     MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
-    MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_NAK_INTERRUPT);
+    //MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_NAK_INTERRUPT);
     MAP_I2C_clearInterruptFlag(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0);
 
     //Enable master Transmit interrupt
 
-    MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_NAK_INTERRUPT);
+    //MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_NAK_INTERRUPT);
     MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_RECEIVE_INTERRUPT0);
     MAP_I2C_enableInterrupt(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0);
 
-    MAP_Interrupt_enableSleepOnIsrExit();
+    //MAP_Interrupt_enableSleepOnIsrExit();
     MAP_Interrupt_enableInterrupt(INT_EUSCIB0);
 
 
     // Enable and clear the interrupt flag
-    MAP_Interrupt_enableMaster();
+  //  MAP_Interrupt_enableMaster();
 }
 
 
@@ -396,23 +402,25 @@ void AD_configure_sensor(void) {
 // Function to write data to the VEML7700 sensor
 void AD_I2C_write(uint8_t slaveAddress, uint8_t *data, uint8_t length)
 {
-
+    bool ret_status;
 //    I2C_masterSendStart(EUSCI_B0_BASE);
     // The mode to transmit
     MAP_I2C_setMode(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_MODE);
 
-    MAP_I2C_masterSendMultiByteStart(EUSCI_B0_BASE, slaveAddress);
+//    MAP_I2C_masterSendMultiByteStart(EUSCI_B0_BASE, slaveAddress);
+    ret_status = I2C_masterSendMultiByteStartWithTimeout(EUSCI_B0_BASE, slaveAddress, 100);
+//    while (!I2C_getInterruptStatus(EUSCI_B0_BASE, EUSCI_B_I2C_TRANSMIT_INTERRUPT0)) /*EMPTY*/;
     // Start the transmission
-    I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
+    MAP_I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
 
     // Transmit the data bytes
     while (length-- > 1)
     {
-      I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
+      MAP_I2C_masterSendMultiByteNext(EUSCI_B0_BASE, *(data++));
     }
 
     // Send the stop condition
-    I2C_masterSendMultiByteFinish(EUSCI_B0_BASE, *data);
+    MAP_I2C_masterSendMultiByteFinish(EUSCI_B0_BASE, *data);
 }
 
 /*******************************************************************************
